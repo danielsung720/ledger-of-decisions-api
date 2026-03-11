@@ -1,0 +1,132 @@
+# flyctl launch added from .gitignore
+**/*.log
+**/.DS_Store
+**/.env
+database/*.sqlite
+**/.env.backup*
+**/.env.production
+**/.phpactor.json
+**/.phpunit.result.cache
+.fleet
+.idea
+.nova
+.phpunit.cache
+.vscode
+.zed
+auth.json
+node_modules
+public/build
+public/hot
+public/storage
+storage/*.key
+storage/pail
+vendor
+**/Homestead.json
+**/Homestead.yaml
+**/Thumbs.db
+
+# flyctl launch added from bootstrap/cache/.gitignore
+bootstrap/cache/**/*
+!bootstrap/cache/**/.gitignore
+
+# flyctl launch added from database/.gitignore
+database/**/*.sqlite*
+
+# flyctl launch added from storage/app/.gitignore
+storage/app/**/*
+!storage/app/**/private
+!storage/app/**/public
+!storage/app/**/.gitignore
+
+# flyctl launch added from storage/app/private/.gitignore
+storage/app/private/**/*
+!storage/app/private/**/.gitignore
+
+# flyctl launch added from storage/app/public/.gitignore
+storage/app/public/**/*
+!storage/app/public/**/.gitignore
+
+# flyctl launch added from storage/framework/.gitignore
+storage/framework/**/compiled.php
+storage/framework/**/config.php
+storage/framework/**/down
+storage/framework/**/events.scanned.php
+storage/framework/**/maintenance.php
+storage/framework/**/routes.php
+storage/framework/**/routes.scanned.php
+storage/framework/**/schedule-*
+storage/framework/**/services.json
+
+# flyctl launch added from storage/framework/cache/.gitignore
+storage/framework/cache/**/*
+!storage/framework/cache/**/data
+!storage/framework/cache/**/.gitignore
+
+# flyctl launch added from storage/framework/cache/data/.gitignore
+storage/framework/cache/data/**/*
+!storage/framework/cache/data/**/.gitignore
+
+# flyctl launch added from storage/framework/sessions/.gitignore
+storage/framework/sessions/**/*
+!storage/framework/sessions/**/.gitignore
+
+# flyctl launch added from storage/framework/testing/.gitignore
+storage/framework/testing/**/*
+!storage/framework/testing/**/.gitignore
+
+# flyctl launch added from storage/framework/views/.gitignore
+storage/framework/views/**/*
+!storage/framework/views/**/.gitignore
+
+# flyctl launch added from storage/logs/.gitignore
+storage/logs/**/*
+!storage/logs/**/.gitignore
+
+# flyctl launch added from vendor/hamcrest/hamcrest-php/.gitignore
+vendor/hamcrest/hamcrest-php/**/composer.lock
+vendor/hamcrest/hamcrest-php/**/tests/.phpunit.result.cache
+vendor/hamcrest/hamcrest-php/**/vendor
+
+# flyctl launch added from vendor/mockery/mockery/docs/.gitignore
+vendor/mockery/mockery/docs/**/_build
+
+# flyctl launch added from vendor/psr/container/.gitignore
+vendor/psr/container/**/composer.lock
+vendor/psr/container/**/composer.phar
+vendor/psr/container/vendor
+
+# flyctl launch added from vendor/psr/event-dispatcher/.gitignore
+vendor/psr/event-dispatcher/vendor
+vendor/psr/event-dispatcher/**/composer.lock
+
+# flyctl launch added from vendor/swagger-api/swagger-ui/.gitignore
+vendor/swagger-api/swagger-ui/**/node_modules
+vendor/swagger-api/swagger-ui/**/.idea
+vendor/swagger-api/swagger-ui/**/.vscode
+vendor/swagger-api/swagger-ui/**/.deps_check
+vendor/swagger-api/swagger-ui/**/.DS_Store
+vendor/swagger-api/swagger-ui/**/.env.local
+vendor/swagger-api/swagger-ui/**/.env.development.local
+vendor/swagger-api/swagger-ui/**/.env.test.local
+vendor/swagger-api/swagger-ui/**/.env.production.local
+vendor/swagger-api/swagger-ui/**/.nyc_output
+vendor/swagger-api/swagger-ui/**/npm-debug.log*
+vendor/swagger-api/swagger-ui/**/.eslintcache
+vendor/swagger-api/swagger-ui/**/*.iml
+vendor/swagger-api/swagger-ui/**/selenium-debug.log
+vendor/swagger-api/swagger-ui/**/chromedriver.log
+vendor/swagger-api/swagger-ui/**/test/e2e/db.json
+vendor/swagger-api/swagger-ui/**/docs/_book
+vendor/swagger-api/swagger-ui/**/dev-helpers/examples
+
+# dist
+vendor/swagger-api/swagger-ui/**/flavors/**/dist/*
+vendor/swagger-api/swagger-ui/lib
+vendor/swagger-api/swagger-ui/es
+vendor/swagger-api/swagger-ui/**/dist/log*
+vendor/swagger-api/swagger-ui/swagger-ui-*.tgz
+
+# Cypress
+vendor/swagger-api/swagger-ui/**/test/e2e-cypress/screenshots
+vendor/swagger-api/swagger-ui/**/test/e2e-cypress/videos
+fly.toml

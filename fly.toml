@@ -1,0 +1,54 @@
+# fly.toml app configuration file generated for ledger-of-decisions-api on 2026-03-10T17:10:16+08:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'ledger-of-decisions-api'
+primary_region = 'nrt'
+
+[build]
+  dockerfile = 'Dockerfile.fly'
+
+[env]
+  APP_DEBUG = 'false'
+  APP_ENV = 'production'
+  APP_FALLBACK_LOCALE = 'en'
+  APP_LOCALE = 'en'
+  APP_NAME = 'Ledger of Decisions'
+  BCRYPT_ROUNDS = '12'
+  CACHE_STORE = 'redis'
+  CACHE_STORE_FALLBACK = 'database'
+  DB_CONNECTION = 'pgsql'
+  DB_PORT = '5432'
+  LOG_CHANNEL = 'stderr'
+  LOG_LEVEL = 'error'
+  MAIL_FROM_ADDRESS = 'noreply@yourdomain.com'
+  MAIL_FROM_NAME = 'Ledger of Decisions'
+  MAIL_MAILER = 'resend'
+  QUEUE_CONNECTION = 'database'
+  REDIS_CLIENT = 'phpredis'
+  REDIS_PORT = '6379'
+  SESSION_DRIVER = 'redis'
+  SESSION_LIFETIME = '120'
+
+[deploy]
+  release_command = "php artisan migrate --force"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/api/health'
+
+[[vm]]
+  memory = '256mb'
+  cpus = 1
+  memory_mb = 256

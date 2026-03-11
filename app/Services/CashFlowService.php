@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\DTO\CashFlow\CashFlowProjectionItemDto;
+use App\DTO\CashFlow\CashFlowProjectionQueryDto;
+use App\DTO\CashFlow\CashFlowSummaryDto;
+use App\DTO\CashFlow\CashFlowSummaryQueryDto;
+use App\Repositories\CashFlowRepository;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
+
+/**
+ * Application service for cash flow summary and projection use-cases.
+ */
+class CashFlowService
+{
+    public function __construct(
+        private readonly CashFlowRepository $cashFlowRepository
+    ) {
+    }
+
+    /**
+     * Compute aggregate monthly cash flow summary.
+     */
+    public function getSummary(CashFlowSummaryQueryDto $query): CashFlowSummaryDto
+    {
+        $amounts = $this->cashFlowRepository->getSummaryAmounts($query);
+        $netCashFlow = $amounts->totalIncome - $amounts->totalExpense;
+        $savingsRate = $amounts->totalIncome > 0
+            ? ($netCashFlow / $amounts->totalIncome) * 100
+            : 0.0;
+
+        return new CashFlowSummaryDto(
+            totalIncome: $amounts->totalIncome,
+            totalExpense: $amounts->totalExpense,
+            netCashFlow: $netCashFlow,
+            savingsRate: $savingsRate,
+        );
+    }
+
+    /**
+     * Build month-by-month cash flow projection from current month.
+     *
+     * @return Collection<int, CashFlowProjectionItemDto>
+     */
+    public function getProjection(CashFlowProjectionQueryDto $query): Collection
+    {
+        $startMonth = Carbon::now()->startOfMonth();
+        $monthAmounts = $this->cashFlowRepository->getProjectionMonthAmounts($query, $startMonth);
+
+        $cumulativeBalance = 0.0;
+        $result = [];
+
+        foreach ($monthAmounts as $monthAmount) {
+            $net = $monthAmount->income - $monthAmount->expense;
+            $cumulativeBalance += $net;
+
+            $result[] = new CashFlowProjectionItemDto(
+                month: $monthAmount->month,
+                income: $monthAmount->income,
+                expense: $monthAmount->expense,
+                net: $net,
+                cumulativeBalance: $cumulativeBalance,
+            );
+        }
+
+        return collect($result);
+    }
+}

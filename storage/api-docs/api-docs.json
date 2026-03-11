@@ -1,0 +1,757 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Ledger of Decisions API",
+        "description": "決策驅動的記帳 API - 每筆消費都標註決策意圖",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8080/api",
+            "description": "本地開發環境"
+        }
+    ],
+    "paths": {
+        "/expenses/{expense_id}/decision": {
+            "get": {
+                "tags": [
+                    "Decisions"
+                ],
+                "summary": "查詢決策標註",
+                "operationId": "af326e159988e9df7038b86b84e08d08",
+                "parameters": [
+                    {
+                        "name": "expense_id",
+                        "in": "path",
+                        "description": "消費記錄 ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功"
+                    },
+                    "404": {
+                        "description": "消費記錄或決策標註不存在"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Decisions"
+                ],
+                "summary": "更新決策標註",
+                "operationId": "b06a4eae5103d383dbb5170caa479a9a",
+                "parameters": [
+                    {
+                        "name": "expense_id",
+                        "in": "path",
+                        "description": "消費記錄 ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "intent"
+                                ],
+                                "properties": {
+                                    "intent": {
+                                        "$ref": "#/components/schemas/Intent"
+                                    },
+                                    "confidence_level": {
+                                        "$ref": "#/components/schemas/ConfidenceLevel"
+                                    },
+                                    "decision_note": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "更新成功"
+                    },
+                    "404": {
+                        "description": "消費記錄或決策標註不存在"
+                    },
+                    "422": {
+                        "description": "驗證失敗"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Decisions"
+                ],
+                "summary": "新增決策標註",
+                "description": "為消費記錄新增決策標註，每筆消費只能有一個決策",
+                "operationId": "8c027cd0b15a80d12a5a07bcbda9d57d",
+                "parameters": [
+                    {
+                        "name": "expense_id",
+                        "in": "path",
+                        "description": "消費記錄 ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "intent"
+                                ],
+                                "properties": {
+                                    "intent": {
+                                        "$ref": "#/components/schemas/Intent"
+                                    },
+                                    "confidence_level": {
+                                        "$ref": "#/components/schemas/ConfidenceLevel"
+                                    },
+                                    "decision_note": {
+                                        "type": "string",
+                                        "example": "這是必要的開支"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "建立成功"
+                    },
+                    "404": {
+                        "description": "消費記錄不存在"
+                    },
+                    "422": {
+                        "description": "已有決策標註或驗證失敗"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Decisions"
+                ],
+                "summary": "刪除決策標註",
+                "operationId": "96dda031e43e62711f62234fbb9e596e",
+                "parameters": [
+                    {
+                        "name": "expense_id",
+                        "in": "path",
+                        "description": "消費記錄 ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "刪除成功"
+                    },
+                    "404": {
+                        "description": "消費記錄或決策標註不存在"
+                    }
+                }
+            }
+        },
+        "/entries": {
+            "post": {
+                "tags": [
+                    "Entries"
+                ],
+                "summary": "合併新增消費與決策",
+                "description": "一次新增消費記錄和決策標註，適合快速記帳場景。使用 transaction 確保原子性。",
+                "operationId": "7aaa30ab1a747b80aec490f4ad3ff1ed",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "amount",
+                                    "category",
+                                    "occurred_at",
+                                    "intent"
+                                ],
+                                "properties": {
+                                    "amount": {
+                                        "description": "消費金額",
+                                        "type": "number",
+                                        "example": 250
+                                    },
+                                    "currency": {
+                                        "description": "幣別，預設 TWD",
+                                        "type": "string",
+                                        "example": "TWD"
+                                    },
+                                    "category": {
+                                        "$ref": "#/components/schemas/Category"
+                                    },
+                                    "occurred_at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2026-02-06 08:00:00"
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "example": "計程車"
+                                    },
+                                    "intent": {
+                                        "$ref": "#/components/schemas/Intent"
+                                    },
+                                    "confidence_level": {
+                                        "$ref": "#/components/schemas/ConfidenceLevel"
+                                    },
+                                    "decision_note": {
+                                        "type": "string",
+                                        "example": "趕時間必須搭計程車"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "建立成功"
+                    },
+                    "422": {
+                        "description": "驗證失敗"
+                    }
+                }
+            }
+        },
+        "/expenses": {
+            "get": {
+                "tags": [
+                    "Expenses"
+                ],
+                "summary": "查詢消費列表",
+                "description": "取得消費記錄列表，支援分頁和多種篩選條件",
+                "operationId": "36e62ecfbcfde37686ea63fe89d0c0c0",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "頁碼",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "每頁筆數",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    },
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "description": "起始日期 (YYYY-MM-DD)",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "description": "結束日期 (YYYY-MM-DD)",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "preset",
+                        "in": "query",
+                        "description": "預設時間範圍",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "today",
+                                "this_week",
+                                "this_month"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "類別篩選 (可用逗號分隔多選)",
+                        "schema": {
+                            "type": "string",
+                            "example": "food,transport"
+                        }
+                    },
+                    {
+                        "name": "intent",
+                        "in": "query",
+                        "description": "意圖篩選 (可用逗號分隔多選)",
+                        "schema": {
+                            "type": "string",
+                            "example": "necessity,impulse"
+                        }
+                    },
+                    {
+                        "name": "confidence_level",
+                        "in": "query",
+                        "description": "信心程度篩選",
+                        "schema": {
+                            "type": "string",
+                            "example": "high,medium"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Expenses"
+                ],
+                "summary": "新增消費記錄",
+                "operationId": "927e29ac31ae983af0a55ce5d487d554",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "amount",
+                                    "category",
+                                    "occurred_at"
+                                ],
+                                "properties": {
+                                    "amount": {
+                                        "type": "number",
+                                        "example": 150
+                                    },
+                                    "currency": {
+                                        "type": "string",
+                                        "example": "TWD"
+                                    },
+                                    "category": {
+                                        "$ref": "#/components/schemas/Category"
+                                    },
+                                    "occurred_at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2026-02-06 12:00:00"
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "example": "午餐便當"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "建立成功"
+                    },
+                    "422": {
+                        "description": "驗證失敗"
+                    }
+                }
+            }
+        },
+        "/expenses/{id}": {
+            "get": {
+                "tags": [
+                    "Expenses"
+                ],
+                "summary": "查詢單筆消費",
+                "operationId": "b8d5c673ecdbb6a51bea7ec7cc5d0e30",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "消費記錄 ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功"
+                    },
+                    "404": {
+                        "description": "找不到資源"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Expenses"
+                ],
+                "summary": "更新消費記錄",
+                "operationId": "36a4200b139cad8582ff017bbdb5750e",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "消費記錄 ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "amount": {
+                                        "type": "number",
+                                        "example": 200
+                                    },
+                                    "currency": {
+                                        "type": "string",
+                                        "example": "TWD"
+                                    },
+                                    "category": {
+                                        "$ref": "#/components/schemas/Category"
+                                    },
+                                    "occurred_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "example": "午餐便當 + 飲料"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "更新成功"
+                    },
+                    "404": {
+                        "description": "找不到資源"
+                    },
+                    "422": {
+                        "description": "驗證失敗"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Expenses"
+                ],
+                "summary": "刪除消費記錄",
+                "operationId": "b261a1443844b958952ae83b03fbbfa3",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "消費記錄 ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "刪除成功"
+                    },
+                    "404": {
+                        "description": "找不到資源"
+                    }
+                }
+            }
+        },
+        "/statistics/intents": {
+            "get": {
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "Intent 統計",
+                "description": "查看各決策意圖的出現次數與平均信心程度",
+                "operationId": "e7e5dbea28c297168539449bc689019b",
+                "parameters": [
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "description": "起始日期",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "description": "結束日期",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "preset",
+                        "in": "query",
+                        "description": "預設時間範圍",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "today",
+                                "this_week",
+                                "this_month"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功"
+                    }
+                }
+            }
+        },
+        "/statistics/summary": {
+            "get": {
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "消費總覽",
+                "description": "取得消費統計總覽，包含分類統計、意圖統計、衝動消費比例",
+                "operationId": "5ce0d2094febdb98df917efd9114b3a9",
+                "parameters": [
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "description": "起始日期",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "description": "結束日期",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "preset",
+                        "in": "query",
+                        "description": "預設時間範圍",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "today",
+                                "this_week",
+                                "this_month"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功"
+                    }
+                }
+            }
+        },
+        "/statistics/trends": {
+            "get": {
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "趨勢指標",
+                "description": "取得衝動消費週對週比較、高信心決策統計",
+                "operationId": "4d6ec547971dbfd54d1ad8137e480d26",
+                "responses": {
+                    "200": {
+                        "description": "成功"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Category": {
+                "description": "消費類別：food=飲食, transport=交通, training=學習/訓練, living=生活, other=其他",
+                "type": "string",
+                "enum": [
+                    "food",
+                    "transport",
+                    "training",
+                    "living",
+                    "other"
+                ]
+            },
+            "Intent": {
+                "description": "決策意圖：necessity=必要性, efficiency=效率, enjoyment=享受, recovery=恢復, impulse=衝動",
+                "type": "string",
+                "enum": [
+                    "necessity",
+                    "efficiency",
+                    "enjoyment",
+                    "recovery",
+                    "impulse"
+                ]
+            },
+            "ConfidenceLevel": {
+                "description": "信心程度：high=高, medium=中, low=低",
+                "type": "string",
+                "enum": [
+                    "high",
+                    "medium",
+                    "low"
+                ]
+            },
+            "Decision": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "expense_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "intent": {
+                        "$ref": "#/components/schemas/Intent"
+                    },
+                    "intent_label": {
+                        "type": "string",
+                        "example": "必要性"
+                    },
+                    "confidence_level": {
+                        "$ref": "#/components/schemas/ConfidenceLevel"
+                    },
+                    "confidence_level_label": {
+                        "type": "string",
+                        "example": "高"
+                    },
+                    "decision_note": {
+                        "type": "string",
+                        "example": "這是必要開支",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Expense": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "amount": {
+                        "type": "string",
+                        "example": "150.00"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "TWD"
+                    },
+                    "category": {
+                        "$ref": "#/components/schemas/Category"
+                    },
+                    "category_label": {
+                        "type": "string",
+                        "example": "飲食"
+                    },
+                    "occurred_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "note": {
+                        "type": "string",
+                        "example": "午餐",
+                        "nullable": true
+                    },
+                    "decision": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Decision"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Expenses",
+            "description": "消費記錄"
+        },
+        {
+            "name": "Decisions",
+            "description": "決策標註"
+        },
+        {
+            "name": "Entries",
+            "description": "合併新增"
+        },
+        {
+            "name": "Statistics",
+            "description": "統計分析"
+        }
+    ]
+}
