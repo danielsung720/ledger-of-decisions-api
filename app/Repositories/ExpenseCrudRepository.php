@@ -53,7 +53,7 @@ class ExpenseCrudRepository
             $now = Carbon::now(config('app.timezone'));
 
             match ($queryDto->filters->preset) {
-                DatePreset::Today => $query->whereDate('occurred_at', $now->toDateString()),
+                DatePreset::Today => $query->whereBetween('occurred_at', [$now->copy()->startOfDay(), $now->copy()->endOfDay()]),
                 DatePreset::ThisWeek => $query->whereBetween('occurred_at', [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()]),
                 DatePreset::ThisMonth => $query->whereBetween('occurred_at', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()]),
             };
