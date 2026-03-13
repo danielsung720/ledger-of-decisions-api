@@ -16,8 +16,8 @@ RUN apk add --no-cache \
     supervisor \
     $PHPIZE_DEPS
 
-# Install PHP extensions (no xdebug in production)
-RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd intl
+# Install PHP extensions for production runtime
+RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd intl opcache
 
 # Install Redis extension
 RUN pecl install redis && docker-php-ext-enable redis
