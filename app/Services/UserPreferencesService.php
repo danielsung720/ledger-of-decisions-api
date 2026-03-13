@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Cache;
+use App\Support\RedisHelper;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class UserPreferencesService
 {
     private const DEFAULT_THEME = 'default';
+
     private const VALID_THEMES = ['default', 'code', 'ocean'];
+
+    public function __construct(
+        private readonly RedisHelper $redisHelper
+    ) {
+    }
 
     /**
      * 取得使用者偏好設定
@@ -19,7 +24,18 @@ class UserPreferencesService
     public function get(int $userId): array
     {
         try {
-            $cached = Cache::get($this->buildKey($userId));
+            $newKey = $this->redisHelper->buildUserPreferencesKey($userId);
+            $legacyKey = $this->redisHelper->buildLegacyUserPreferencesKey($userId);
+            $cached = $this->redisHelper->get($newKey);
+
+            if ($cached === null) {
+                $cached = $this->redisHelper->get($legacyKey);
+
+                if ($cached !== null) {
+                    // Transition path: migrate legacy key payload to new key.
+                    $this->redisHelper->forever($newKey, $cached);
+                }
+            }
 
             if ($cached === null) {
                 return $this->getDefaultPreferences();
@@ -27,7 +43,7 @@ class UserPreferencesService
 
             $preferences = json_decode($cached, true);
 
-            if (!is_array($preferences)) {
+            if (! is_array($preferences)) {
                 return $this->getDefaultPreferences();
             }
 
@@ -51,10 +67,13 @@ class UserPreferencesService
         $merged = array_merge($current, $preferences);
 
         try {
-            Cache::forever(
-                $this->buildKey($userId),
-                json_encode($merged, JSON_THROW_ON_ERROR)
-            );
+            $encoded = json_encode($merged, JSON_THROW_ON_ERROR);
+            $newKey = $this->redisHelper->buildUserPreferencesKey($userId);
+            $legacyKey = $this->redisHelper->buildLegacyUserPreferencesKey($userId);
+
+            // Transition path: keep legacy readers alive during rollout.
+            $this->redisHelper->forever($newKey, $encoded);
+            $this->redisHelper->forever($legacyKey, $encoded);
         } catch (\Throwable $e) {
             Log::error('Failed to save user preferences to Redis', [
                 'user_id' => $userId,
@@ -81,7 +100,7 @@ class UserPreferencesService
      */
     public function setTheme(int $userId, string $theme): void
     {
-        if (!$this->isValidTheme($theme)) {
+        if (! $this->isValidTheme($theme)) {
             throw new \InvalidArgumentException("Invalid theme: {$theme}");
         }
 
@@ -112,16 +131,5 @@ class UserPreferencesService
         return [
             'ui_theme' => self::DEFAULT_THEME,
         ];
-    }
-
-    /**
-     * 建立 Redis key
-     */
-    private function buildKey(int $userId): string
-    {
-        $app = Str::slug((string) config('app.name', 'ledger'));
-        $env = strtolower((string) config('app.env', 'local'));
-
-        return "{$app}:{$env}:user_preferences:{$userId}";
     }
 }

@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
+use App\Support\RedisHelper;
 
 class VerificationCodeService
 {
@@ -15,21 +14,23 @@ class VerificationCodeService
     private const MAX_ATTEMPTS = 5;
     private const LOCKOUT_SECONDS = 900;
 
+    public function __construct(
+        private readonly RedisHelper $redisHelper
+    ) {
+    }
+
     public function generate(string $type, string $email): string
     {
         $code = $this->generateCode();
+        $codeKeys = $this->getCodeKeys($type, $email);
+        $sentAtKeys = $this->getSentAtKeys($type, $email);
 
-        Cache::put(
-            $this->getCodeKey($type, $email),
-            $code,
-            now()->addSeconds(self::CODE_TTL_SECONDS)
-        );
-
-        Cache::put(
-            $this->getSentAtKey($type, $email),
-            now()->timestamp,
-            now()->addSeconds(self::COOLDOWN_SECONDS)
-        );
+        foreach ($codeKeys as $key) {
+            $this->redisHelper->put($key, $code, now()->addSeconds(self::CODE_TTL_SECONDS));
+        }
+        foreach ($sentAtKeys as $key) {
+            $this->redisHelper->put($key, now()->timestamp, now()->addSeconds(self::COOLDOWN_SECONDS));
+        }
 
         return $code;
     }
@@ -40,25 +41,33 @@ class VerificationCodeService
             return false;
         }
 
-        $storedCode = Cache::get($this->getCodeKey($type, $email));
+        $storedCode = $this->getFromKeys($this->getCodeKeys($type, $email));
 
         if ($storedCode === null || $storedCode !== $code) {
             $this->incrementAttempts($type, $email);
+
             return false;
         }
 
         $this->clearCode($type, $email);
+
         return true;
     }
 
     public function canResend(string $type, string $email): bool
     {
-        return !Cache::has($this->getSentAtKey($type, $email));
+        foreach ($this->getSentAtKeys($type, $email) as $key) {
+            if ($this->redisHelper->has($key)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function getCooldownSeconds(string $type, string $email): int
     {
-        $sentAt = Cache::get($this->getSentAtKey($type, $email));
+        $sentAt = $this->getFromKeys($this->getSentAtKeys($type, $email));
 
         if ($sentAt === null) {
             return 0;
@@ -73,19 +82,25 @@ class VerificationCodeService
     public function isLockedOut(string $type, string $email): bool
     {
         $attempts = $this->getAttempts($type, $email);
+
         return $attempts >= self::MAX_ATTEMPTS;
     }
 
     public function getRemainingAttempts(string $type, string $email): int
     {
         $attempts = $this->getAttempts($type, $email);
+
         return max(0, self::MAX_ATTEMPTS - $attempts);
     }
 
     public function clearCode(string $type, string $email): void
     {
-        Cache::forget($this->getCodeKey($type, $email));
-        Cache::forget($this->getAttemptsKey($type, $email));
+        foreach ($this->getCodeKeys($type, $email) as $key) {
+            $this->redisHelper->forget($key);
+        }
+        foreach ($this->getAttemptsKeys($type, $email) as $key) {
+            $this->redisHelper->forget($key);
+        }
     }
 
     private function generateCode(): string
@@ -93,44 +108,71 @@ class VerificationCodeService
         return str_pad((string) random_int(0, 999999), self::CODE_LENGTH, '0', STR_PAD_LEFT);
     }
 
-    private function getCodeKey(string $type, string $email): string
+    /**
+     * @return array<int, string>
+     */
+    private function getCodeKeys(string $type, string $email): array
     {
-        return $this->buildKey($type, $email, 'code');
+        return $this->buildKeys($type, $email, 'Code', 'code');
     }
 
-    private function getSentAtKey(string $type, string $email): string
+    /**
+     * @return array<int, string>
+     */
+    private function getSentAtKeys(string $type, string $email): array
     {
-        return $this->buildKey($type, $email, 'sent_at');
+        return $this->buildKeys($type, $email, 'SentAt', 'sent_at');
     }
 
-    private function getAttemptsKey(string $type, string $email): string
+    /**
+     * @return array<int, string>
+     */
+    private function getAttemptsKeys(string $type, string $email): array
     {
-        return $this->buildKey($type, $email, 'attempts');
+        return $this->buildKeys($type, $email, 'Attempts', 'attempts');
     }
 
-    private function buildKey(string $type, string $email, string $suffix): string
+    /**
+     * @return array<int, string>
+     */
+    private function buildKeys(string $type, string $email, string $suffix, string $legacySuffix): array
     {
-        $app = Str::slug((string) config('app.name', 'ledger'));
-        $env = strtolower((string) config('app.env', 'local'));
         $normalizedEmail = strtolower(trim($email));
         $emailHash = sha1($normalizedEmail);
 
-        return "{$app}:{$env}:verification:{$type}:{$emailHash}:{$suffix}";
+        return [
+            $this->redisHelper->buildVerificationKey($type, $emailHash, $suffix),
+            $this->redisHelper->buildLegacyVerificationKey($type, $emailHash, $legacySuffix),
+        ];
     }
 
     private function getAttempts(string $type, string $email): int
     {
-        return (int) Cache::get($this->getAttemptsKey($type, $email), 0);
+        return (int) $this->getFromKeys($this->getAttemptsKeys($type, $email), 0);
     }
 
     private function incrementAttempts(string $type, string $email): void
     {
         $attempts = $this->getAttempts($type, $email) + 1;
 
-        Cache::put(
-            $this->getAttemptsKey($type, $email),
-            $attempts,
-            now()->addSeconds(self::LOCKOUT_SECONDS)
-        );
+        foreach ($this->getAttemptsKeys($type, $email) as $key) {
+            $this->redisHelper->put($key, $attempts, now()->addSeconds(self::LOCKOUT_SECONDS));
+        }
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     */
+    private function getFromKeys(array $keys, mixed $default = null): mixed
+    {
+        foreach ($keys as $key) {
+            $value = $this->redisHelper->get($key);
+
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
+        return $default;
     }
 }

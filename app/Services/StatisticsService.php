@@ -12,6 +12,8 @@ use App\DTO\Statistics\StatisticsQueryDto;
 use App\DTO\Statistics\SummaryStatisticsDto;
 use App\DTO\Statistics\TrendsStatisticsDto;
 use App\DTO\Statistics\TrendsStatisticsQueryDto;
+use App\Enums\CacheDomainEnum;
+use App\Enums\CacheEndpointEnum;
 use App\Enums\Category;
 use App\Enums\Intent;
 use App\Repositories\ExpenseRepository;
@@ -23,13 +25,18 @@ use Illuminate\Support\Collection;
 class StatisticsService
 {
     private const CONFIDENCE_HIGH_THRESHOLD = 2.5;
+
     private const CONFIDENCE_MEDIUM_THRESHOLD = 1.5;
+
     private const CONFIDENCE_LEVEL_HIGH = 'high';
+
     private const CONFIDENCE_LEVEL_MEDIUM = 'medium';
+
     private const CONFIDENCE_LEVEL_LOW = 'low';
 
     public function __construct(
-        private readonly ExpenseRepository $expenseRepository
+        private readonly ExpenseRepository $expenseRepository,
+        private readonly ?ApiReadCacheService $apiReadCacheService = null
     ) {
     }
 
@@ -59,6 +66,27 @@ class StatisticsService
      * Build summary metrics grouped by category and intent.
      */
     public function getSummaryStatistics(StatisticsQueryDto $query): SummaryStatisticsDto
+    {
+        $cacheService = $this->readCacheService();
+
+        return $cacheService->remember(
+            domain: CacheDomainEnum::Statistics,
+            endpoint: CacheEndpointEnum::Summary,
+            userId: $query->scope->userIds()[0],
+            query: [
+                'preset' => $query->filter->preset?->value,
+                'start_date' => $query->filter->startDate,
+                'end_date' => $query->filter->endDate,
+            ],
+            ttlSeconds: $cacheService->ttlSeconds(CacheDomainEnum::Statistics, CacheEndpointEnum::Summary),
+            resolver: fn (): SummaryStatisticsDto => $this->buildSummaryStatistics($query),
+        );
+    }
+
+    /**
+     * Build summary metrics grouped by category and intent.
+     */
+    private function buildSummaryStatistics(StatisticsQueryDto $query): SummaryStatisticsDto
     {
         $byCategory = $this->expenseRepository
             ->getSummaryByCategory($query)
@@ -105,6 +133,35 @@ class StatisticsService
      */
     public function getTrendsStatistics(TrendsStatisticsQueryDto $query): TrendsStatisticsDto
     {
+        $cacheService = $this->readCacheService();
+
+        return $cacheService->remember(
+            domain: CacheDomainEnum::Statistics,
+            endpoint: CacheEndpointEnum::Trends,
+            userId: $query->scope->userIds()[0],
+            query: ['high_confidence_limit' => $query->highConfidenceLimit],
+            ttlSeconds: $cacheService->ttlSeconds(CacheDomainEnum::Statistics, CacheEndpointEnum::Trends),
+            resolver: fn (): TrendsStatisticsDto => $this->buildTrendsStatistics($query),
+        );
+    }
+
+    /**
+     * Map average confidence score to configured level labels.
+     */
+    private function scoreToConfidenceLevel(float $score): string
+    {
+        return match (true) {
+            $score >= self::CONFIDENCE_HIGH_THRESHOLD => self::CONFIDENCE_LEVEL_HIGH,
+            $score >= self::CONFIDENCE_MEDIUM_THRESHOLD => self::CONFIDENCE_LEVEL_MEDIUM,
+            default => self::CONFIDENCE_LEVEL_LOW,
+        };
+    }
+
+    /**
+     * Build week-over-week impulse trend and top high-confidence intents.
+     */
+    private function buildTrendsStatistics(TrendsStatisticsQueryDto $query): TrendsStatisticsDto
+    {
         $impulseComparison = $this->expenseRepository->getTrendsImpulseComparison($query);
         $thisWeekImpulse = $impulseComparison->thisWeek;
         $lastWeekImpulse = $impulseComparison->lastWeek;
@@ -134,15 +191,8 @@ class StatisticsService
         );
     }
 
-    /**
-     * Map average confidence score to configured level labels.
-     */
-    private function scoreToConfidenceLevel(float $score): string
+    private function readCacheService(): ApiReadCacheService
     {
-        return match (true) {
-            $score >= self::CONFIDENCE_HIGH_THRESHOLD => self::CONFIDENCE_LEVEL_HIGH,
-            $score >= self::CONFIDENCE_MEDIUM_THRESHOLD => self::CONFIDENCE_LEVEL_MEDIUM,
-            default => self::CONFIDENCE_LEVEL_LOW,
-        };
+        return $this->apiReadCacheService ?? app(ApiReadCacheService::class);
     }
 }
