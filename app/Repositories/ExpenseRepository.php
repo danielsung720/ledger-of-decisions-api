@@ -12,7 +12,6 @@ use App\DTO\Statistics\StatisticsQueryDto;
 use App\DTO\Statistics\SummaryTotalsDto;
 use App\DTO\Statistics\TrendsImpulseComparisonDto;
 use App\DTO\Statistics\TrendsStatisticsQueryDto;
-use App\Enums\Category;
 use App\Enums\ConfidenceLevel;
 use App\Enums\DatePreset;
 use App\Enums\Intent;
@@ -176,7 +175,7 @@ class ExpenseRepository
             $endOfMonth = $now->copy()->endOfMonth();
 
             match ($queryDto->filter->preset) {
-                DatePreset::Today => $query->whereDate($column, $now->toDateString()),
+                DatePreset::Today => $query->whereBetween($column, [$now->copy()->startOfDay(), $now->copy()->endOfDay()]),
                 DatePreset::ThisWeek => $query->whereBetween($column, [$startOfWeek, $endOfWeek]),
                 DatePreset::ThisMonth => $query->whereBetween($column, [$startOfMonth, $endOfMonth]),
             };
