@@ -7,6 +7,8 @@
 
 本文件提供 Redis 快取切換在測試環境/正式環境的操作步驟、驗證方法、回滾流程與事件應變指引。
 
+Key 命名與舊新 key 對照請參考：`docs/REDIS_KEY_INVENTORY.md`。
+
 ## 2. 前置條件
 
 - 服務已支援 `CACHE_STORE=redis`。

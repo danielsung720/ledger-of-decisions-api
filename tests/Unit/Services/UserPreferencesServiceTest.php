@@ -16,7 +16,7 @@ class UserPreferencesServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new UserPreferencesService();
+        $this->service = app(UserPreferencesService::class);
         Cache::flush();
     }
 

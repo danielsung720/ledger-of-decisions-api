@@ -6,10 +6,12 @@ namespace Tests\Unit\Services;
 
 use App\DTO\Decision\CreateDecisionDto;
 use App\DTO\Decision\UpdateDecisionDto;
+use App\Enums\CacheDomainEnum;
 use App\Enums\Intent;
 use App\Models\Decision;
 use App\Models\Expense;
 use App\Repositories\DecisionRepository;
+use App\Services\ApiReadCacheService;
 use App\Services\DecisionService;
 use App\Support\AccessScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +31,7 @@ class DecisionServiceTest extends TestCase
     }
 
     #[Test]
-    public function create_for_expense_should_return_null_when_decision_already_exists(): void
+    public function CreateForExpenseShouldReturnNullWhenDecisionAlreadyExists(): void
     {
         $expense = Expense::factory()->create();
         Decision::factory()->create(['expense_id' => $expense->id]);
@@ -41,7 +43,7 @@ class DecisionServiceTest extends TestCase
     }
 
     #[Test]
-    public function show_for_expense_should_return_decision_when_exists(): void
+    public function ShowForExpenseShouldReturnDecisionWhenExists(): void
     {
         $expense = Expense::factory()->create();
         $expected = Decision::factory()->create(['expense_id' => $expense->id]);
@@ -54,7 +56,7 @@ class DecisionServiceTest extends TestCase
     }
 
     #[Test]
-    public function update_for_expense_should_return_null_when_decision_missing(): void
+    public function UpdateForExpenseShouldReturnNullWhenDecisionMissing(): void
     {
         $expense = Expense::factory()->create();
         $scope = AccessScope::forUser((int) $expense->user_id);
@@ -65,7 +67,7 @@ class DecisionServiceTest extends TestCase
     }
 
     #[Test]
-    public function delete_for_expense_should_delete_when_decision_exists(): void
+    public function DeleteForExpenseShouldDeleteWhenDecisionExists(): void
     {
         $expense = Expense::factory()->create();
         $decision = Decision::factory()->create(['expense_id' => $expense->id]);
@@ -78,7 +80,7 @@ class DecisionServiceTest extends TestCase
     }
 
     #[Test]
-    public function update_for_expense_should_persist_payload(): void
+    public function UpdateForExpenseShouldPersistPayload(): void
     {
         $expense = Expense::factory()->create();
         Decision::factory()->create(['expense_id' => $expense->id, 'intent' => Intent::Necessity]);
@@ -92,5 +94,92 @@ class DecisionServiceTest extends TestCase
 
         $this->assertNotNull($updated);
         $this->assertSame(Intent::Impulse, $updated->intent);
+    }
+
+    #[Test]
+    public function CreateForExpenseShouldInvalidateStatisticsAndExpensesCacheVersions(): void
+    {
+        $repository = $this->createMock(DecisionRepository::class);
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+        $expense = new Expense(['user_id' => 31]);
+        $calls = [];
+
+        $repository->expects($this->once())
+            ->method('create')
+            ->willReturn(new Decision());
+
+        $cacheService->expects($this->exactly(2))
+            ->method('invalidateDomainVersion')
+            ->willReturnCallback(function (int $userId, CacheDomainEnum $domain) use (&$calls): int {
+                $calls[] = [$userId, $domain->value];
+
+                return 2;
+            });
+
+        $service = new DecisionService($repository, $cacheService);
+        $service->createForExpense(
+            AccessScope::forUser(31),
+            $expense,
+            new CreateDecisionDto('necessity', null, null)
+        );
+
+        $this->assertSame([[31, 'Statistics'], [31, 'Expenses']], $calls);
+    }
+
+    #[Test]
+    public function UpdateForExpenseShouldInvalidateStatisticsAndExpensesCacheVersions(): void
+    {
+        $repository = $this->createMock(DecisionRepository::class);
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+        $expense = new Expense(['user_id' => 42]);
+        $expense->setRelation('decision', new Decision());
+        $calls = [];
+
+        $repository->expects($this->once())
+            ->method('update')
+            ->willReturn(new Decision());
+
+        $cacheService->expects($this->exactly(2))
+            ->method('invalidateDomainVersion')
+            ->willReturnCallback(function (int $userId, CacheDomainEnum $domain) use (&$calls): int {
+                $calls[] = [$userId, $domain->value];
+
+                return 2;
+            });
+
+        $service = new DecisionService($repository, $cacheService);
+        $service->updateForExpense(
+            AccessScope::forUser(42),
+            $expense,
+            new UpdateDecisionDto(['intent' => 'impulse'])
+        );
+
+        $this->assertSame([[42, 'Statistics'], [42, 'Expenses']], $calls);
+    }
+
+    #[Test]
+    public function DeleteForExpenseShouldInvalidateStatisticsAndExpensesCacheVersions(): void
+    {
+        $repository = $this->createMock(DecisionRepository::class);
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+        $expense = new Expense(['user_id' => 53]);
+        $expense->setRelation('decision', new Decision());
+        $calls = [];
+
+        $repository->expects($this->once())->method('delete');
+
+        $cacheService->expects($this->exactly(2))
+            ->method('invalidateDomainVersion')
+            ->willReturnCallback(function (int $userId, CacheDomainEnum $domain) use (&$calls): int {
+                $calls[] = [$userId, $domain->value];
+
+                return 2;
+            });
+
+        $service = new DecisionService($repository, $cacheService);
+        $deleted = $service->deleteForExpense(AccessScope::forUser(53), $expense);
+
+        $this->assertTrue($deleted);
+        $this->assertSame([[53, 'Statistics'], [53, 'Expenses']], $calls);
     }
 }

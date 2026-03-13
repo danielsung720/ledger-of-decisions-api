@@ -13,8 +13,11 @@ use App\DTO\Statistics\StatisticsQueryDto;
 use App\DTO\Statistics\SummaryTotalsDto;
 use App\DTO\Statistics\TrendsImpulseComparisonDto;
 use App\DTO\Statistics\TrendsStatisticsQueryDto;
+use App\Enums\CacheDomainEnum;
+use App\Enums\CacheEndpointEnum;
 use App\Enums\Category;
 use App\Repositories\ExpenseRepository;
+use App\Services\ApiReadCacheService;
 use App\Services\StatisticsService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -152,5 +155,46 @@ class StatisticsServiceTest extends TestCase
 
         $this->assertSame(100, $result->changePercentage);
         $this->assertSame('up', $result->trend);
+    }
+
+    #[Test]
+    public function GetSummaryStatisticsShouldPassNormalizedCacheQuery(): void
+    {
+        $repository = $this->createMock(ExpenseRepository::class);
+        $repository->method('getSummaryByCategory')->willReturn(collect());
+        $repository->method('getSummaryByIntent')->willReturn(collect());
+        $repository->method('getSummaryTotals')->willReturn(new SummaryTotalsDto(totalAmount: 0.0, totalCount: 0, impulseCount: 0));
+
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+        $cacheService->expects($this->once())
+            ->method('ttlSeconds')
+            ->with(CacheDomainEnum::Statistics, CacheEndpointEnum::Summary)
+            ->willReturn(60);
+
+        $cacheService->expects($this->once())
+            ->method('remember')
+            ->with(
+                CacheDomainEnum::Statistics,
+                CacheEndpointEnum::Summary,
+                123,
+                [
+                    'preset' => 'this_month',
+                    'start_date' => '2026-03-01',
+                    'end_date' => '2026-03-31',
+                ],
+                60,
+                $this->isType('callable')
+            )
+            ->willReturnCallback(
+                fn (CacheDomainEnum $domain, CacheEndpointEnum $endpoint, int $userId, array $query, int $ttlSeconds, callable $resolver): mixed => $resolver()
+            );
+
+        $service = new StatisticsService($repository, $cacheService);
+        $service->getSummaryStatistics(
+            StatisticsQueryDto::forUser(
+                123,
+                new StatisticsFilterDto(startDate: '2026-03-01', endDate: '2026-03-31', preset: \App\Enums\DatePreset::ThisMonth)
+            )
+        );
     }
 }

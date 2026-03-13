@@ -7,9 +7,12 @@ namespace Tests\Unit\Services;
 use App\DTO\CashFlow\CashFlowProjectionFiltersDto;
 use App\DTO\CashFlow\CashFlowProjectionQueryDto;
 use App\DTO\CashFlow\CashFlowSummaryQueryDto;
+use App\Enums\CacheDomainEnum;
+use App\Enums\CacheEndpointEnum;
 use App\Models\CashFlowItem;
 use App\Models\Income;
 use App\Repositories\CashFlowRepository;
+use App\Services\ApiReadCacheService;
 use App\Services\CashFlowService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,7 +30,7 @@ class CashFlowServiceTest extends TestCase
     {
         parent::setUp();
         $this->setUpAuthenticatesUser();
-        $this->service = new CashFlowService(new CashFlowRepository());
+        $this->service = new CashFlowService(new CashFlowRepository);
         Carbon::setTestNow('2026-02-08');
     }
 
@@ -110,5 +113,37 @@ class CashFlowServiceTest extends TestCase
         $this->assertSame('2026/02', $projection[0]->month);
         $this->assertSame('30000.00', $projection[0]->toArray()['net']);
         $this->assertSame('90000.00', $projection[2]->toArray()['cumulative_balance']);
+    }
+
+    #[Test]
+    public function GetProjectionShouldPassMonthsIntoCacheQuery(): void
+    {
+        $repository = $this->createMock(CashFlowRepository::class);
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+
+        $cacheService->expects($this->once())
+            ->method('ttlSeconds')
+            ->with(CacheDomainEnum::CashFlow, CacheEndpointEnum::CashFlowProjection)
+            ->willReturn(180);
+
+        $cacheService->expects($this->once())
+            ->method('remember')
+            ->with(
+                CacheDomainEnum::CashFlow,
+                CacheEndpointEnum::CashFlowProjection,
+                (int) $this->user->id,
+                ['months' => 6],
+                180,
+                $this->isType('callable')
+            )
+            ->willReturn(collect());
+
+        $service = new CashFlowService($repository, $cacheService);
+        $service->getProjection(
+            CashFlowProjectionQueryDto::forUser(
+                (int) $this->user->id,
+                new CashFlowProjectionFiltersDto(months: 6)
+            )
+        );
     }
 }

@@ -10,16 +10,21 @@ use App\DTO\Expense\ExpenseBatchDeleteQueryDto;
 use App\DTO\Expense\ExpenseFiltersDto;
 use App\DTO\Expense\ExpensePaginateQueryDto;
 use App\DTO\Expense\UpdateExpenseDto;
+use App\Enums\CacheDomainEnum;
+use App\Enums\CacheEndpointEnum;
 use App\Enums\Category;
 use App\Enums\ConfidenceLevel;
+use App\Enums\DatePreset;
 use App\Enums\Intent;
 use App\Models\Decision;
 use App\Models\Expense;
 use App\Models\User;
 use App\Repositories\ExpenseCrudRepository;
+use App\Services\ApiReadCacheService;
 use App\Services\ExpenseService;
 use App\Support\AccessScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Pagination\LengthAwarePaginator;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Tests\Traits\AuthenticatesUser;
@@ -34,7 +39,7 @@ class ExpenseServiceTest extends TestCase
     {
         parent::setUp();
         $this->setUpAuthenticatesUser();
-        $this->service = new ExpenseService(new ExpenseCrudRepository());
+        $this->service = new ExpenseService(new ExpenseCrudRepository);
     }
 
     #[Test]
@@ -176,5 +181,172 @@ class ExpenseServiceTest extends TestCase
         $this->assertDatabaseMissing('expenses', ['id' => $mineA->id]);
         $this->assertDatabaseMissing('expenses', ['id' => $mineB->id]);
         $this->assertDatabaseHas('expenses', ['id' => $others->id]);
+    }
+
+    #[Test]
+    public function PaginateShouldUseReadCacheForDashboardRecentQuery(): void
+    {
+        request()->query->set('page', 1);
+
+        $repository = $this->createMock(ExpenseCrudRepository::class);
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+        $query = new ExpensePaginateQueryDto(
+            scope: AccessScope::forUser((int) $this->user->id),
+            filters: new ExpenseFiltersDto(
+                startDate: null,
+                endDate: null,
+                preset: DatePreset::ThisMonth,
+                categories: [],
+                intents: [],
+                confidenceLevels: [],
+                perPage: 5,
+            )
+        );
+
+        $paginator = new LengthAwarePaginator([], 0, 5, 1);
+
+        $cacheService->expects($this->once())
+            ->method('ttlSeconds')
+            ->with(CacheDomainEnum::Expenses, CacheEndpointEnum::Index)
+            ->willReturn(45);
+
+        $cacheService->expects($this->once())
+            ->method('remember')
+            ->with(
+                CacheDomainEnum::Expenses,
+                CacheEndpointEnum::Index,
+                (int) $this->user->id,
+                [
+                    'preset' => 'this_month',
+                    'per_page' => 5,
+                    'page' => 1,
+                    'category' => '',
+                    'intent' => '',
+                    'confidence_level' => '',
+                ],
+                45,
+                $this->isType('callable')
+            )
+            ->willReturn($paginator);
+
+        $service = new ExpenseService($repository, $cacheService);
+        $result = $service->paginate($query);
+
+        $this->assertSame($paginator, $result);
+    }
+
+    #[Test]
+    public function CreateShouldInvalidateStatisticsAndExpensesCacheVersions(): void
+    {
+        $repository = $this->createMock(ExpenseCrudRepository::class);
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+        $expense = new Expense(['user_id' => 77]);
+        $calls = [];
+
+        $repository->expects($this->once())
+            ->method('create')
+            ->willReturn($expense);
+
+        $cacheService->expects($this->exactly(2))
+            ->method('invalidateDomainVersion')
+            ->willReturnCallback(function (int $userId, CacheDomainEnum $domain) use (&$calls): int {
+                $calls[] = [$userId, $domain->value];
+
+                return 2;
+            });
+
+        $service = new ExpenseService($repository, $cacheService);
+        $service->create(
+            CreateExpenseDto::fromArray([
+                'amount' => 200,
+                'category' => Category::Food->value,
+                'occurred_at' => '2026-03-13 10:00:00',
+            ])
+        );
+
+        $this->assertSame([[77, 'Statistics'], [77, 'Expenses']], $calls);
+    }
+
+    #[Test]
+    public function UpdateShouldInvalidateStatisticsAndExpensesCacheVersions(): void
+    {
+        $repository = $this->createMock(ExpenseCrudRepository::class);
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+        $expense = new Expense(['user_id' => 55]);
+        $calls = [];
+
+        $repository->expects($this->once())
+            ->method('update')
+            ->willReturn($expense);
+
+        $cacheService->expects($this->exactly(2))
+            ->method('invalidateDomainVersion')
+            ->willReturnCallback(function (int $userId, CacheDomainEnum $domain) use (&$calls): int {
+                $calls[] = [$userId, $domain->value];
+
+                return 2;
+            });
+
+        $service = new ExpenseService($repository, $cacheService);
+        $service->update($expense, UpdateExpenseDto::fromArray(['amount' => 123]));
+
+        $this->assertSame([[55, 'Statistics'], [55, 'Expenses']], $calls);
+    }
+
+    #[Test]
+    public function DeleteShouldInvalidateStatisticsAndExpensesCacheVersions(): void
+    {
+        $repository = $this->createMock(ExpenseCrudRepository::class);
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+        $expense = new Expense(['user_id' => 88]);
+        $calls = [];
+
+        $repository->expects($this->once())->method('delete');
+
+        $cacheService->expects($this->exactly(2))
+            ->method('invalidateDomainVersion')
+            ->willReturnCallback(function (int $userId, CacheDomainEnum $domain) use (&$calls): int {
+                $calls[] = [$userId, $domain->value];
+
+                return 2;
+            });
+
+        $service = new ExpenseService($repository, $cacheService);
+        $service->delete($expense);
+
+        $this->assertSame([[88, 'Statistics'], [88, 'Expenses']], $calls);
+    }
+
+    #[Test]
+    public function BatchDeleteShouldInvalidateScopeUsersWhenRecordsDeleted(): void
+    {
+        $repository = $this->createMock(ExpenseCrudRepository::class);
+        $cacheService = $this->createMock(ApiReadCacheService::class);
+        $calls = [];
+
+        $repository->expects($this->once())
+            ->method('batchDelete')
+            ->willReturn(2);
+
+        $cacheService->expects($this->exactly(4))
+            ->method('invalidateDomainVersion')
+            ->willReturnCallback(function (int $userId, CacheDomainEnum $domain) use (&$calls): int {
+                $calls[] = [$userId, $domain->value];
+
+                return 2;
+            });
+
+        $service = new ExpenseService($repository, $cacheService);
+        $service->batchDelete(
+            new ExpenseBatchDeleteQueryDto(
+                scope: AccessScope::forUsers([11, 22]),
+                payload: new BatchDeleteExpenseDto([1, 2])
+            )
+        );
+
+        $this->assertSame(
+            [[11, 'Statistics'], [11, 'Expenses'], [22, 'Statistics'], [22, 'Expenses']],
+            $calls
+        );
     }
 }

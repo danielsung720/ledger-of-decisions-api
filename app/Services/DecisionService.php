@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\DTO\Decision\CreateDecisionDto;
 use App\DTO\Decision\UpdateDecisionDto;
+use App\Enums\CacheDomainEnum;
 use App\Models\Decision;
 use App\Models\Expense;
 use App\Repositories\DecisionRepository;
@@ -18,7 +19,8 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 class DecisionService
 {
     public function __construct(
-        private readonly DecisionRepository $decisionRepository
+        private readonly DecisionRepository $decisionRepository,
+        private readonly ?ApiReadCacheService $apiReadCacheService = null
     ) {
     }
 
@@ -33,7 +35,10 @@ class DecisionService
             return null;
         }
 
-        return $this->decisionRepository->create($scope, $expense, $payload);
+        $decision = $this->decisionRepository->create($scope, $expense, $payload);
+        $this->invalidateAfterWrite((int) $expense->user_id);
+
+        return $decision;
     }
 
     /**
@@ -55,7 +60,10 @@ class DecisionService
             return null;
         }
 
-        return $this->decisionRepository->update($scope, $expense, $payload);
+        $updatedDecision = $this->decisionRepository->update($scope, $expense, $payload);
+        $this->invalidateAfterWrite((int) $expense->user_id);
+
+        return $updatedDecision;
     }
 
     /**
@@ -70,6 +78,7 @@ class DecisionService
         }
 
         $this->decisionRepository->delete($scope, $expense);
+        $this->invalidateAfterWrite((int) $expense->user_id);
 
         return true;
     }
@@ -79,5 +88,12 @@ class DecisionService
         if (! in_array((int) $expense->user_id, $scope->userIds(), true)) {
             throw (new ModelNotFoundException())->setModel(Expense::class, [$expense->id]);
         }
+    }
+
+    private function invalidateAfterWrite(int $userId): void
+    {
+        $cacheService = $this->apiReadCacheService ?? app(ApiReadCacheService::class);
+        $cacheService->invalidateDomainVersion($userId, CacheDomainEnum::Statistics);
+        $cacheService->invalidateDomainVersion($userId, CacheDomainEnum::Expenses);
     }
 }
