@@ -9,7 +9,7 @@ Backend API service for **Ledger of Decisions** - a personal finance application
 - **Framework**: Laravel 12 (PHP 8.4)
 - **Database**: SQLite (dev) / PostgreSQL (prod)
 - **Cache**: Redis 7
-- **Auth**: Laravel Sanctum (token-based)
+- **Auth**: Laravel Sanctum (stateful session + CSRF)
 - **Docs**: L5 Swagger (OpenAPI)
 - **Email**: Resend
 - **Container**: Docker (PHP-FPM + Nginx)
@@ -46,6 +46,11 @@ Copy `.env.example` to `.env` and adjust as needed. Key variables:
 | `CACHE_STORE` | `redis` | Cache backend |
 | `MAIL_MAILER` | `log` | Email driver (`log`, `resend`) |
 | `RESEND_API_KEY` | - | Resend API key (production) |
+| `SESSION_DOMAIN` | `null` | Session cookie domain |
+| `SESSION_SECURE_COOKIE` | `false` | Require HTTPS for session cookie |
+| `SESSION_SAME_SITE` | `lax` | Session cookie same-site policy |
+| `SANCTUM_STATEFUL_DOMAINS` | `localhost,...` | Frontend domains using cookie auth |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,...` | Allowed credentialed frontend origins |
 
 ## Architecture
 
@@ -69,6 +74,14 @@ app/
 
 ## API Endpoints
 
+### Stateful Auth Flow
+
+1. Call `GET /sanctum/csrf-cookie` from frontend origin to receive `XSRF-TOKEN`.
+2. Call `POST /api/login` with credentials (session cookie is established).
+3. For write requests, send `X-XSRF-TOKEN` header.
+4. Call `POST /api/logout` to invalidate session.
+5. `Authorization: Bearer <token>` is disabled for protected API routes.
+
 ### Public
 
 | Method | Endpoint | Description |
@@ -80,8 +93,9 @@ app/
 | `POST` | `/api/resend-verification` | Resend verification code |
 | `POST` | `/api/forgot-password` | Request password reset |
 | `POST` | `/api/reset-password` | Complete password reset |
+| `GET` | `/sanctum/csrf-cookie` | Issue XSRF-TOKEN cookie |
 
-### Protected (Bearer Token)
+### Protected (Session Cookie)
 
 **User**
 

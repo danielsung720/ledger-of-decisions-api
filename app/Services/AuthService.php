@@ -16,7 +16,6 @@ use App\Models\User;
 use App\Repositories\AuthRepository;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Application service for authentication and account security workflows.
@@ -139,7 +138,7 @@ class AuthService
     }
 
     /**
-     * Authenticate user and issue API token.
+     * Authenticate user for session-based login flow.
      */
     public function login(LoginDto $payload): AuthOperationResultDto
     {
@@ -161,27 +160,21 @@ class AuthService
             );
         }
 
-        $token = $this->authRepository->createAuthToken($user);
-
         return new AuthOperationResultDto(
             success: true,
             statusCode: 200,
             message: '登入成功',
             data: [
                 'user' => (new UserResource($user))->resolve(),
-                'token' => $token,
-                'token_type' => 'Bearer',
             ],
         );
     }
 
     /**
-     * Logout user by revoking current access token.
+     * Build logout response payload for session-based auth.
      */
-    public function logout(User $user, ?PersonalAccessToken $token): AuthOperationResultDto
+    public function logout(): AuthOperationResultDto
     {
-        $this->authRepository->deleteCurrentAccessToken($user, $token);
-
         return new AuthOperationResultDto(
             success: true,
             statusCode: 200,
@@ -270,8 +263,7 @@ class AuthService
             );
         }
 
-        $updated = $this->authRepository->updatePassword($user, $payload->password);
-        $this->authRepository->revokeAllTokens($updated);
+        $this->authRepository->updatePassword($user, $payload->password);
 
         return new AuthOperationResultDto(
             success: true,

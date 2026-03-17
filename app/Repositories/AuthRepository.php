@@ -6,7 +6,6 @@ namespace App\Repositories;
 
 use App\DTO\Auth\RegisterDto;
 use App\Models\User;
-use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Persistence operations for authentication and user account state.
@@ -45,26 +44,6 @@ class AuthRepository
     }
 
     /**
-     * Create auth token for API usage.
-     */
-    public function createAuthToken(User $user): string
-    {
-        return $user->createToken('auth_token')->plainTextToken;
-    }
-
-    /**
-     * Revoke current access token.
-     */
-    public function deleteCurrentAccessToken(User $user, ?PersonalAccessToken $token): void
-    {
-        if ($token === null) {
-            return;
-        }
-
-        $user->tokens()->whereKey($token->getKey())->delete();
-    }
-
-    /**
      * Update user's password.
      */
     public function updatePassword(User $user, string $password): User
@@ -73,13 +52,5 @@ class AuthRepository
         $user->save();
 
         return $user;
-    }
-
-    /**
-     * Revoke all issued tokens.
-     */
-    public function revokeAllTokens(User $user): void
-    {
-        $user->tokens()->delete();
     }
 }

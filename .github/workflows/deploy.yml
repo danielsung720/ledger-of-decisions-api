@@ -32,12 +32,12 @@ jobs:
       - name: PHPStan
         run: ./vendor/bin/phpstan analyse --memory-limit=512M --no-progress
         env:
-          APP_KEY: base64:dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXQ=
+          APP_KEY: base64:dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleTEyMzQ=
 
       - name: Run tests
         run: ./vendor/bin/phpunit
         env:
-          APP_KEY: base64:dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXQ=
+          APP_KEY: base64:dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleTEyMzQ=
 
   deploy:
     name: Deploy

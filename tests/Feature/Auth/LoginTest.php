@@ -35,10 +35,37 @@ class LoginTest extends TestCase
                 'success',
                 'data' => [
                     'user' => ['id', 'name', 'email'],
-                    'token',
-                    'token_type',
                 ],
                 'message',
+            ]);
+
+        $response->assertJsonMissingPath('data.token');
+        $response->assertJsonMissingPath('data.token_type');
+    }
+
+    #[Test]
+    public function LoginCreatesSessionForSubsequentRequest(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'session@example.com',
+            'password' => 'password123',
+        ]);
+
+        $this->withHeader('Origin', 'http://localhost:3000')
+            ->postJson('/api/login', [
+                'email' => 'session@example.com',
+                'password' => 'password123',
+            ])->assertStatus(200);
+
+        $this->withHeader('Origin', 'http://localhost:3000')
+            ->getJson('/api/user')
+            ->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'id' => $user->id,
+                    'email' => 'session@example.com',
+                ],
             ]);
     }
 

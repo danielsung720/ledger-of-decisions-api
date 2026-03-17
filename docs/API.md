@@ -30,6 +30,14 @@
 
 **時區**: Asia/Taipei (UTC+8)
 
+**認證方式**: Sanctum Stateful Session（HttpOnly Cookie）+ CSRF Token
+
+寫入型請求（`POST/PUT/PATCH/DELETE`）建議流程：
+1. `GET /sanctum/csrf-cookie` 取得 `XSRF-TOKEN` cookie。
+2. `POST /api/login` 建立 session。
+3. 後續寫入請求攜帶 `X-XSRF-TOKEN` header。
+4. 受保護 API 不接受 `Authorization: Bearer <token>`。
+
 ---
 
 ## 環境設置
@@ -131,6 +139,16 @@ POST /api/register
 
 ---
 
+#### 取得 CSRF Cookie
+
+```http
+GET /sanctum/csrf-cookie
+```
+
+**Response** (204 No Content): 設定 `XSRF-TOKEN` cookie。
+
+---
+
 #### 登入
 
 ```http
@@ -155,9 +173,7 @@ POST /api/login
       "id": 1,
       "name": "Test User",
       "email": "test@example.com"
-    },
-    "token": "1|plain_text_token",
-    "token_type": "Bearer"
+    }
   }
 }
 ```
@@ -305,6 +321,9 @@ POST /api/logout
 ```
 
 **Response** (200 OK): `success: true` + `message`
+
+**Error**:
+- `419`: 缺失或錯誤 CSRF token
 
 ---
 
