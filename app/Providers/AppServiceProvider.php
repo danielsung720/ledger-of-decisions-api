@@ -13,6 +13,7 @@ use App\Listeners\InvalidateCashFlowReadCache;
 use App\Listeners\InvalidateReadCacheOnExpenseWithDecisionCreated;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +30,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Enforce session-only auth for first-party API; disable bearer token auth path.
+        Sanctum::getAccessTokenFromRequestUsing(static fn () => null);
+
         Event::listen(
             [
                 IncomeCreated::class,

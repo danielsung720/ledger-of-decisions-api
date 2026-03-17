@@ -14,6 +14,7 @@ use App\Http\Requests\Auth\VerifyEmailRequest;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use OpenApi\Attributes as OA;
 
 /**
@@ -91,6 +92,13 @@ class AuthController extends Controller
     {
         $result = $this->authService->login($request->toDto());
 
+        if ($result->success && isset($result->data['user']['id'])) {
+            Auth::guard('web')->loginUsingId((int) $result->data['user']['id']);
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+            }
+        }
+
         return response()->json($result->toArray(), $result->statusCode);
     }
 
@@ -105,7 +113,13 @@ class AuthController extends Controller
     )]
     public function logout(Request $request): JsonResponse
     {
-        $result = $this->authService->logout($request->user(), $request->user()->currentAccessToken());
+        Auth::guard('web')->logout();
+        if ($request->hasSession()) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
+
+        $result = $this->authService->logout();
 
         return response()->json($result->toArray(), $result->statusCode);
     }

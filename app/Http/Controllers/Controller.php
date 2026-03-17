@@ -21,9 +21,17 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'Statistics', description: '統計分析')]
 #[OA\SecurityScheme(
     securityScheme: 'sanctum',
-    type: 'http',
-    scheme: 'bearer',
-    bearerFormat: 'Bearer Token'
+    type: 'apiKey',
+    in: 'cookie',
+    name: 'laravel_session',
+    description: 'Sanctum stateful session cookie'
+)]
+#[OA\SecurityScheme(
+    securityScheme: 'xsrf',
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-XSRF-TOKEN',
+    description: 'Required for stateful unsafe methods (POST/PUT/PATCH/DELETE)'
 )]
 #[OA\Schema(
     schema: 'Category',

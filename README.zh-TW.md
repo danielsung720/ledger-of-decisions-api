@@ -9,7 +9,7 @@
 - **框架**: Laravel 12 (PHP 8.4)
 - **資料庫**: SQLite (開發) / PostgreSQL (正式)
 - **快取**: Redis 7
-- **認證**: Laravel Sanctum (Token-based)
+- **認證**: Laravel Sanctum (Stateful Session + CSRF)
 - **文件**: L5 Swagger (OpenAPI)
 - **郵件**: Resend
 - **容器化**: Docker (PHP-FPM + Nginx)
@@ -46,6 +46,11 @@ API 服務位於 `http://localhost:8080/api/`。
 | `CACHE_STORE` | `redis` | 快取後端 |
 | `MAIL_MAILER` | `log` | 郵件驅動 (`log`, `resend`) |
 | `RESEND_API_KEY` | - | Resend API 金鑰 (正式環境) |
+| `SESSION_DOMAIN` | `null` | Session cookie 網域 |
+| `SESSION_SECURE_COOKIE` | `false` | 是否僅允許 HTTPS session cookie |
+| `SESSION_SAME_SITE` | `lax` | Session cookie same-site 策略 |
+| `SANCTUM_STATEFUL_DOMAINS` | `localhost,...` | 使用 cookie 認證的前端網域 |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,...` | 可攜帶 credentials 的前端來源 |
 
 ## 架構
 
@@ -69,6 +74,14 @@ app/
 
 ## API 端點
 
+### Stateful Auth 流程
+
+1. 前端先呼叫 `GET /sanctum/csrf-cookie` 取得 `XSRF-TOKEN`。
+2. 呼叫 `POST /api/login` 送出帳密，建立 session cookie。
+3. 寫入型請求需攜帶 `X-XSRF-TOKEN` header。
+4. 呼叫 `POST /api/logout` 使 session 失效。
+5. 受保護 API 路由已停用 `Authorization: Bearer <token>`。
+
 ### 公開路由
 
 | 方法 | 端點 | 說明 |
@@ -80,8 +93,9 @@ app/
 | `POST` | `/api/resend-verification` | 重寄驗證碼 |
 | `POST` | `/api/forgot-password` | 請求密碼重設 |
 | `POST` | `/api/reset-password` | 完成密碼重設 |
+| `GET` | `/sanctum/csrf-cookie` | 取得 XSRF-TOKEN Cookie |
 
-### 受保護路由 (Bearer Token)
+### 受保護路由 (Session Cookie)
 
 **使用者**
 

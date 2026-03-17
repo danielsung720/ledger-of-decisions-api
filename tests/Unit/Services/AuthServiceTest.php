@@ -46,7 +46,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function register_should_create_user_and_return_created_result(): void
+    public function RegisterShouldCreateUserAndReturnCreatedResult(): void
     {
         $this->verificationCodeService
             ->shouldReceive('generate')
@@ -71,7 +71,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function register_should_still_return_success_when_mail_send_fails(): void
+    public function RegisterShouldStillReturnSuccessWhenMailSendFails(): void
     {
         $this->verificationCodeService
             ->shouldReceive('generate')
@@ -95,7 +95,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function login_should_return_token_for_verified_user(): void
+    public function LoginShouldReturnUserPayloadForVerifiedUser(): void
     {
         $user = User::factory()->create([
             'email' => 'verified@example.com',
@@ -109,13 +109,13 @@ class AuthServiceTest extends TestCase
         $this->assertTrue($result->success);
         $this->assertSame(200, $result->statusCode);
         $this->assertSame('登入成功', $result->message);
-        $this->assertSame('Bearer', $result->data['token_type']);
-        $this->assertNotEmpty($result->data['token']);
         $this->assertSame($user->email, $result->data['user']['email']);
+        $this->assertArrayNotHasKey('token', $result->data);
+        $this->assertArrayNotHasKey('token_type', $result->data);
     }
 
     #[Test]
-    public function login_should_return_email_not_verified_for_unverified_user(): void
+    public function LoginShouldReturnEmailNotVerifiedForUnverifiedUser(): void
     {
         User::factory()->unverified()->create([
             'email' => 'unverified@example.com',
@@ -133,7 +133,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function forgot_password_should_return_generic_success_when_cannot_resend(): void
+    public function ForgotPasswordShouldReturnGenericSuccessWhenCannotResend(): void
     {
         User::factory()->create(['email' => 'cooldown@example.com']);
 
@@ -153,13 +153,12 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function reset_password_should_update_password_and_revoke_tokens(): void
+    public function ResetPasswordShouldUpdatePassword(): void
     {
         $user = User::factory()->create([
             'email' => 'reset@example.com',
             'password' => 'oldpassword',
         ]);
-        $user->createToken('old');
 
         $this->verificationCodeService
             ->shouldReceive('isLockedOut')
@@ -186,11 +185,10 @@ class AuthServiceTest extends TestCase
         $this->assertTrue($result->success);
         $this->assertSame(200, $result->statusCode);
         $this->assertTrue(Hash::check('newpassword123', $user->password));
-        $this->assertSame(0, $user->tokens()->count());
     }
 
     #[Test]
-    public function verify_email_should_return_locked_out_when_attempts_exceeded(): void
+    public function VerifyEmailShouldReturnLockedOutWhenAttemptsExceeded(): void
     {
         $this->verificationCodeService
             ->shouldReceive('isLockedOut')
@@ -207,7 +205,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function verify_email_should_return_remaining_attempts_when_code_invalid(): void
+    public function VerifyEmailShouldReturnRemainingAttemptsWhenCodeInvalid(): void
     {
         $this->verificationCodeService
             ->shouldReceive('isLockedOut')
@@ -237,7 +235,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function verify_email_should_return_not_found_when_user_missing_after_valid_code(): void
+    public function VerifyEmailShouldReturnNotFoundWhenUserMissingAfterValidCode(): void
     {
         $this->verificationCodeService
             ->shouldReceive('isLockedOut')
@@ -261,7 +259,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function verify_email_should_mark_user_as_verified_when_code_valid(): void
+    public function VerifyEmailShouldMarkUserAsVerifiedWhenCodeValid(): void
     {
         $user = User::factory()->unverified()->create(['email' => 'verify@example.com']);
 
@@ -288,7 +286,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function resend_verification_should_return_success_when_user_missing(): void
+    public function ResendVerificationShouldReturnSuccessWhenUserMissing(): void
     {
         $result = $this->service->resendVerification(new EmailOnlyDto(email: 'missing@example.com'));
 
@@ -297,7 +295,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function resend_verification_should_return_generic_success_when_user_already_verified(): void
+    public function ResendVerificationShouldReturnGenericSuccessWhenUserAlreadyVerified(): void
     {
         User::factory()->create(['email' => 'verified@example.com']);
 
@@ -309,7 +307,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function resend_verification_should_return_generic_success_when_cannot_resend(): void
+    public function ResendVerificationShouldReturnGenericSuccessWhenCannotResend(): void
     {
         User::factory()->unverified()->create(['email' => 'cooldown-verify@example.com']);
 
@@ -327,7 +325,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function resend_verification_should_generate_and_send_code_when_allowed(): void
+    public function ResendVerificationShouldGenerateAndSendCodeWhenAllowed(): void
     {
         User::factory()->unverified()->create(['email' => 'resend@example.com']);
 
@@ -357,7 +355,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function resend_verification_should_still_succeed_when_mail_send_fails(): void
+    public function ResendVerificationShouldStillSucceedWhenMailSendFails(): void
     {
         User::factory()->unverified()->create(['email' => 'resend-fail@example.com']);
 
@@ -387,7 +385,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function login_should_return_unauthorized_when_credentials_invalid(): void
+    public function LoginShouldReturnUnauthorizedWhenCredentialsInvalid(): void
     {
         User::factory()->create([
             'email' => 'valid@example.com',
@@ -403,7 +401,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function forgot_password_should_return_success_when_user_missing(): void
+    public function ForgotPasswordShouldReturnSuccessWhenUserMissing(): void
     {
         $result = $this->service->forgotPassword(new EmailOnlyDto(email: 'missing@example.com'));
 
@@ -412,7 +410,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function forgot_password_should_generate_code_when_allowed(): void
+    public function ForgotPasswordShouldGenerateCodeWhenAllowed(): void
     {
         User::factory()->create(['email' => 'forgot@example.com']);
 
@@ -442,7 +440,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function forgot_password_should_still_succeed_when_mail_send_fails(): void
+    public function ForgotPasswordShouldStillSucceedWhenMailSendFails(): void
     {
         User::factory()->create(['email' => 'forgot-fail@example.com']);
 
@@ -472,7 +470,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function reset_password_should_return_locked_out_when_attempts_exceeded(): void
+    public function ResetPasswordShouldReturnLockedOutWhenAttemptsExceeded(): void
     {
         $this->verificationCodeService
             ->shouldReceive('isLockedOut')
@@ -493,7 +491,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function reset_password_should_return_remaining_attempts_when_code_invalid(): void
+    public function ResetPasswordShouldReturnRemainingAttemptsWhenCodeInvalid(): void
     {
         $this->verificationCodeService
             ->shouldReceive('isLockedOut')
@@ -527,7 +525,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function reset_password_should_return_not_found_when_user_missing_after_code_verified(): void
+    public function ResetPasswordShouldReturnNotFoundWhenUserMissingAfterCodeVerified(): void
     {
         $this->verificationCodeService
             ->shouldReceive('isLockedOut')
@@ -554,7 +552,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function update_password_should_persist_new_password(): void
+    public function UpdatePasswordShouldPersistNewPassword(): void
     {
         $user = User::factory()->create(['password' => 'oldpassword']);
 
@@ -570,7 +568,7 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function user_should_return_resource_payload(): void
+    public function UserShouldReturnResourcePayload(): void
     {
         $user = User::factory()->create(['email' => 'profile@example.com']);
 
@@ -582,11 +580,9 @@ class AuthServiceTest extends TestCase
     }
 
     #[Test]
-    public function logout_should_return_success_when_current_token_is_null(): void
+    public function LogoutShouldReturnSuccessPayload(): void
     {
-        $user = User::factory()->create();
-
-        $result = $this->service->logout($user, null);
+        $result = $this->service->logout();
 
         $this->assertTrue($result->success);
         $this->assertSame(200, $result->statusCode);

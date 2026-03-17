@@ -86,12 +86,20 @@ class UserTest extends TestCase
     }
 
     #[Test]
+    public function BearerTokenCannotAccessProtectedRoutes(): void
+    {
+        $this->withHeader('Authorization', 'Bearer legacy_token')
+            ->getJson('/api/user')
+            ->assertStatus(401);
+    }
+
+    #[Test]
     public function AuthenticatedUserCanLogout(): void
     {
         $user = User::factory()->create();
-        $token = $user->createToken('test_token')->plainTextToken;
 
-        $response = $this->withHeader('Authorization', "Bearer {$token}")
+        $response = $this->actingAs($user)
+            ->withHeader('Origin', 'http://localhost:3000')
             ->postJson('/api/logout');
 
         $response->assertStatus(200)
@@ -102,32 +110,28 @@ class UserTest extends TestCase
     }
 
     #[Test]
-    public function LogoutRevokesCurrentToken(): void
+    public function LogoutInvalidatesCurrentSession(): void
     {
-        $user = User::factory()->create();
-        $token = $user->createToken('test_token')->plainTextToken;
+        $user = User::factory()->create([
+            'email' => 'logout-session@example.com',
+            'password' => 'password123',
+        ]);
 
-        $this->assertEquals(1, $user->tokens()->count());
+        $this->withHeader('Origin', 'http://localhost:3000')
+            ->postJson('/api/login', [
+                'email' => 'logout-session@example.com',
+                'password' => 'password123',
+            ])->assertStatus(200);
 
-        $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/logout');
+        $this->withHeader('Origin', 'http://localhost:3000')
+            ->postJson('/api/logout')
+            ->assertStatus(200);
 
-        $this->assertEquals(0, $user->tokens()->count());
-    }
+        $this->app['auth']->forgetGuards();
 
-    #[Test]
-    public function LogoutOnlyRevokesCurrentToken(): void
-    {
-        $user = User::factory()->create();
-        $token1 = $user->createToken('token_1')->plainTextToken;
-        $user->createToken('token_2');
-
-        $this->assertEquals(2, $user->tokens()->count());
-
-        $this->withHeader('Authorization', "Bearer {$token1}")
-            ->postJson('/api/logout');
-
-        $this->assertEquals(1, $user->tokens()->count());
+        $this->withHeader('Origin', 'http://localhost:3000')
+            ->getJson('/api/user')
+            ->assertStatus(401);
     }
 
 }

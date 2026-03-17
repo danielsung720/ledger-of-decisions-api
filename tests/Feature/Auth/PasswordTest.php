@@ -132,28 +132,6 @@ class PasswordTest extends TestCase
     }
 
     #[Test]
-    public function reset_password_revokes_all_tokens(): void
-    {
-        $user = User::factory()->create([
-            'email' => 'user@example.com',
-        ]);
-
-        $user->createToken('test_token');
-        $this->assertEquals(1, $user->tokens()->count());
-
-        $code = $this->verificationCodeService->generate('password_reset', $user->email);
-
-        $this->postJson('/api/reset-password', [
-            'email' => $user->email,
-            'code' => $code,
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
-        ]);
-
-        $this->assertEquals(0, $user->tokens()->count());
-    }
-
-    #[Test]
     public function reset_password_requires_email(): void
     {
         $response = $this->postJson('/api/reset-password', [

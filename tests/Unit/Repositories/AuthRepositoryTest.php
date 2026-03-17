@@ -60,41 +60,6 @@ class AuthRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function CreateAuthTokenShouldCreateToken(): void
-    {
-        $user = User::factory()->create();
-
-        $token = $this->repository->createAuthToken($user);
-
-        $this->assertIsString($token);
-        $this->assertSame(1, $user->tokens()->count());
-    }
-
-    #[Test]
-    public function DeleteCurrentAccessTokenShouldDeleteOnlyGivenToken(): void
-    {
-        $user = User::factory()->create();
-        $tokenA = $user->createToken('a')->accessToken;
-        $tokenB = $user->createToken('b')->accessToken;
-
-        $this->repository->deleteCurrentAccessToken($user, $tokenA);
-
-        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $tokenA->id]);
-        $this->assertDatabaseHas('personal_access_tokens', ['id' => $tokenB->id]);
-    }
-
-    #[Test]
-    public function DeleteCurrentAccessTokenShouldIgnoreNullToken(): void
-    {
-        $user = User::factory()->create();
-        $user->createToken('a');
-
-        $this->repository->deleteCurrentAccessToken($user, null);
-
-        $this->assertSame(1, $user->tokens()->count());
-    }
-
-    #[Test]
     public function UpdatePasswordShouldPersistHashedPassword(): void
     {
         $user = User::factory()->create(['password' => 'oldpassword']);
@@ -104,15 +69,4 @@ class AuthRepositoryTest extends TestCase
         $this->assertTrue(Hash::check('newpassword123', $updated->password));
     }
 
-    #[Test]
-    public function RevokeAllTokensShouldDeleteAllUserTokens(): void
-    {
-        $user = User::factory()->create();
-        $user->createToken('a');
-        $user->createToken('b');
-
-        $this->repository->revokeAllTokens($user);
-
-        $this->assertSame(0, $user->tokens()->count());
-    }
 }
