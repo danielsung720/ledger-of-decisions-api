@@ -32,7 +32,7 @@ primary_region = 'nrt'
   SESSION_LIFETIME = '120'
 
 [deploy]
-  release_command = "php artisan migrate --force"
+  release_command = "sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do php artisan migrate --force && exit 0; echo \"DB not ready, retry $i/10...\"; sleep 5; done; exit 1'"
 
 [http_service]
   internal_port = 8080
