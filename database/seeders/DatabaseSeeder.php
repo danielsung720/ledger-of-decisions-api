@@ -56,5 +56,28 @@ class DatabaseSeeder extends Seeder
             'name' => 'Cashflow Item E2E User',
             'email' => 'cashflow_item@example.com',
         ]);
+
+        // Per-browser isolated users for parallel test runs
+        // Each browser gets its own accounts to avoid data contention
+        $browsers = ['chromium', 'firefox', 'webkit', 'mobile_chrome', 'mobile_safari'];
+
+        $userGroups = [
+            ['E2E Core User',          'e2e_core'],
+            ['Expense CRUD E2E User',  'expense_crud'],
+            ['Batch Delete E2E User',  'batch_delete'],
+            ['Auth E2E User',          'auth_e2e'],
+            ['Recurring E2E User',     'recurring_e2e'],
+            ['Cashflow Income E2E User', 'cashflow_income'],
+            ['Cashflow Item E2E User', 'cashflow_item'],
+        ];
+
+        foreach ($userGroups as [$name, $prefix]) {
+            foreach ($browsers as $browser) {
+                User::factory()->create([
+                    'name'  => "{$name} ({$browser})",
+                    'email' => "{$prefix}_{$browser}@example.com",
+                ]);
+            }
+        }
     }
 }
